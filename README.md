@@ -79,6 +79,13 @@ Below you can see some example of extension use. The example starts some docker 
     <packaging>jar</packaging>
 
     <build>
+        <extensions>
+            <extension>
+                <groupId>com.igormaznitsa</groupId>
+                <artifactId>mvn-finisher-extension</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </extension>
+        </extensions>
         <plugins>
             <plugin>
                 <groupId>io.fabric8</groupId>
