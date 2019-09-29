@@ -6,7 +6,7 @@
     <parent>
         <groupId>com.igormaznitsa</groupId>
         <artifactId>mvn-finisher</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>1.0.0</version>
     </parent>
 
     <name>Maven Finisher Extension</name>

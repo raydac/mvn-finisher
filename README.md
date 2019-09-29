@@ -83,7 +83,7 @@ Below you can see some example of extension use. The example starts some docker 
             <extension>
                 <groupId>com.igormaznitsa</groupId>
                 <artifactId>mvn-finisher-extension</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
+                <version>1.0.0</version>
             </extension>
         </extensions>
         <plugins>

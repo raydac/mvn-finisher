@@ -5,14 +5,16 @@
 
     <groupId>com.igormaznitsa</groupId>
     <artifactId>mvn-finisher</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <packaging>pom</packaging>
+
+    <url>https://github.com/raydac/mvn-finisher</url>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.finisher.version>1.0.0-SNAPSHOT</maven.finisher.version>
+        <maven.finisher.version>1.0.0</maven.finisher.version>
         <mvn.version>3.3.1</mvn.version>
     </properties>
 
