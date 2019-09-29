@@ -45,6 +45,7 @@ import org.codehaus.plexus.logging.Logger;
 @Component(role = AbstractMavenLifecycleParticipant.class, hint = "mvnfinisher")
 public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParticipant {
 
+  public static final String SKIP_PROPERTY = "mvn.finisher.skip";
   public static final String FINISHING_PHASE = "finish";
   public static final String FINISHING_PHASE_OK = "finish-ok";
   public static final String FINISHING_PHASE_ERROR = "finish-error";
@@ -75,18 +76,34 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
     }
   }
 
+  private boolean isTrueSkipFlagFound(final MavenSession session, final MavenProject project) {
+    String value = session.getUserProperties().getProperty(SKIP_PROPERTY, null);
+    if (value == null && project != null) {
+      value = project.getProperties().getProperty(SKIP_PROPERTY, null);
+    }
+    return Boolean.parseBoolean(value);
+  }
+
   @Override
   public void afterSessionEnd(final MavenSession session) throws MavenExecutionException {
-
     if (tryLockFinishingOfSession(session)) {
+      if (isTrueSkipFlagFound(session, null)) {
+        this.logger.info("Skip finishing");
+        return;
+      }
+
       final List<SingleFinishingTask> allFoundTasks = new ArrayList<>();
-      for (final MavenProject p : session.getProjects()) {
-        for (final Plugin pl : p.getBuildPlugins()) {
-          for (final PluginExecution e : pl.getExecutions()) {
-            if (FINISHING_PHASES.contains(e.getPhase())) {
-              final SingleFinishingTask task = new SingleFinishingTask(e.getPhase(), p, pl, e);
+      for (final MavenProject project : session.getProjects()) {
+        if (isTrueSkipFlagFound(session, project)) {
+          this.logger.debug("Detected skip finishing flag for project: " + project.getId());
+          continue;
+        }
+        for (final Plugin buildPlugin : project.getBuildPlugins()) {
+          for (final PluginExecution execution : buildPlugin.getExecutions()) {
+            if (FINISHING_PHASES.contains(execution.getPhase())) {
+              final SingleFinishingTask task = new SingleFinishingTask(execution.getPhase(), project, buildPlugin, execution);
               this.logger.debug("Found finishing task: " + task);
-              allFoundTasks.add(new SingleFinishingTask(e.getPhase(), p, pl, e));
+              allFoundTasks.add(new SingleFinishingTask(execution.getPhase(), project, buildPlugin, execution));
             }
           }
         }

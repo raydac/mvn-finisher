@@ -60,3 +60,5 @@ If defined several finishing tasks then they will be sorted in such manner:
   - __finish__
   
 __Each detected task is called separately in its own maven request so that all them will be executed even if some of them can be error.__
+
+Work of the extension can be disabled through `mvn.finisher.skip` parameter which can be provided globaly through `-Dmvn.finisher.skip=true` else locally on level of each project through its local project properties.
