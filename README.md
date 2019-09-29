@@ -51,7 +51,8 @@ after every end of session build, the extenstion looks for for finishing tasks i
 in the case, after session processing end (either successful or error) the task `print-echo` is executed.
 
 If defined several finishing tasks then they will be sorted in such manner:
-- list of projects with found finishing tasks is reversed
+- list of projects in order provided in maven session project list
+- only projectes with build status will be processed 
 - if any error in session build then execution order is:
   - __finish-error__
   - __finish__
@@ -62,3 +63,78 @@ If defined several finishing tasks then they will be sorted in such manner:
 __Each detected task is called separately in its own maven request so that all them will be executed even if some of them can be error.__
 
 Work of the extension can be disabled through `mvn.finisher.skip` parameter which can be provided globaly through `-Dmvn.finisher.skip=true` else locally on level of each project through its local project properties.
+
+# Example
+Below you can see some example of extension use. The example starts some docker image and then stop and remove it in finishing tasks.
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.igormaznitsa</groupId>
+    <artifactId>mvn-finisher-test-docker</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+
+    <packaging>jar</packaging>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.fabric8</groupId>
+                <artifactId>docker-maven-plugin</artifactId>
+                <version>0.31.0</version>
+                <executions>
+                    <execution>
+                        <id>start-docker-container</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>start</goal>
+                        </goals>
+                        <configuration>
+                            <containerNamePattern>test-container-finisher</containerNamePattern>
+                            <showLogs>true</showLogs>
+                            <images>
+                                <image>
+                                    <name>docker.bintray.io/jfrog/artifactory-oss:latest</name>
+                                    <run>
+                                        <wait>
+                                            <time>60000</time>
+                                            <log>#+\s*Artifactory successfully started \([0-9.]+ seconds\)\s*#+</log>
+                                        </wait>
+                                    </run>
+                                </image>
+                            </images>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>stop-docker-container</id>
+                        <phase>finish</phase>
+                        <goals>
+                            <goal>stop</goal>
+                        </goals>
+                        <configuration>
+                            <stopNamePattern>test-container-finisher</stopNamePattern>
+                            <allContainers>true</allContainers>
+                            <removeVolumes>true</removeVolumes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>remove-docker-container</id>
+                        <phase>finish</phase>
+                        <goals>
+                            <goal>remove</goal>
+                        </goals>
+                        <configuration>
+                            <removeMode>run</removeMode>
+                            <removeNamePattern>test-container-finisher</removeNamePattern>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+
+```

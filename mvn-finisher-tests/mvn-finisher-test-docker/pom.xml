@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.igormaznitsa</groupId>
+        <artifactId>mvn-finisher-tests</artifactId>
+        <version>0.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>mvn-finisher-test-docker</artifactId>
+    <packaging>jar</packaging>
+
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.fabric8</groupId>
+                <artifactId>docker-maven-plugin</artifactId>
+                <version>0.31.0</version>
+                <executions>
+                    <execution>
+                        <id>start-docker-container</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>start</goal>
+                        </goals>
+                        <configuration>
+                            <containerNamePattern>test-container-finisher</containerNamePattern>
+                            <showLogs>true</showLogs>
+                            <images>
+                                <image>
+                                    <name>docker.bintray.io/jfrog/artifactory-oss:latest</name>
+                                    <run>
+                                        <wait>
+                                            <time>60000</time>
+                                            <log>#+\s*Artifactory successfully started \([0-9.]+ seconds\)\s*#+</log>
+                                        </wait>
+                                    </run>
+                                </image>
+                            </images>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>stop-docker-container</id>
+                        <phase>finish</phase>
+                        <goals>
+                            <goal>stop</goal>
+                        </goals>
+                        <configuration>
+                            <stopNamePattern>test-container-finisher</stopNamePattern>
+                            <allContainers>true</allContainers>
+                            <removeVolumes>true</removeVolumes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>remove-docker-container</id>
+                        <phase>finish</phase>
+                        <goals>
+                            <goal>remove</goal>
+                        </goals>
+                        <configuration>
+                            <removeMode>run</removeMode>
+                            <removeNamePattern>test-container-finisher</removeNamePattern>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

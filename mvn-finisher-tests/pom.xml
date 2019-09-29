@@ -15,6 +15,7 @@
 
     <modules>
         <module>mvn-finisher-test-simple</module>
+        <module>mvn-finisher-test-docker</module>
     </modules>
 
     <build>

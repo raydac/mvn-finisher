@@ -124,7 +124,6 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
 
       this.logger.info(String.format("Totally detected %d finishing task(s)", allFoundTasks.size()));
 
-      Collections.reverse(allFoundTasks);
       Collections.sort(allFoundTasks, (x, y) -> {
         if (x.phase.equals(y.phase)) {
           return 0;
@@ -213,6 +212,8 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
 
       final String projectId = project.getGroupId() + ':' + project.getArtifactId();
       newRequest.setSelectedProjects(Collections.singletonList(projectId));
+      newRequest.setDegreeOfConcurrency(1);
+      newRequest.setInteractiveMode(false);
 
       final List<String> goals = new ArrayList<>();
       for (final String g : this.execution.getGoals()) {
