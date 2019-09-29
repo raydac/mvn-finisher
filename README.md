@@ -11,6 +11,7 @@ Small [maven](https://maven.apache.org/) extesion adds three new phases into bui
  - __finish__ is called in any case after session build completion
  - __finish-ok__ is called only if session is built without errors
  - __finish-error__ is called only if session is built with errors
+ It's behavior very similar to well-known `try...catch...finally` mechanism where __finish-error__ situated in the `catch` section and __finish__ situated in the `finally` section, __finish-ok__ will be called as the last ones in the body.
  
  # How to use?
  Just add extension into project build extension section
