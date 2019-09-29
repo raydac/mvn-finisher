@@ -31,6 +31,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.maven.AbstractMavenLifecycleParticipant;
 import org.apache.maven.Maven;
 import org.apache.maven.MavenExecutionException;
+import org.apache.maven.execution.BuildFailure;
+import org.apache.maven.execution.BuildSuccess;
+import org.apache.maven.execution.BuildSummary;
 import org.apache.maven.execution.DefaultMavenExecutionRequest;
 import org.apache.maven.execution.MavenExecutionRequest;
 import org.apache.maven.execution.MavenExecutionResult;
@@ -50,7 +53,9 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
   public static final String FINISHING_PHASE_OK = "finish-ok";
   public static final String FINISHING_PHASE_ERROR = "finish-error";
   public static final String FINISHING_FLAG_FILE = ".finishingStarted";
-  private static final Set<String> FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_ERROR, FINISHING_PHASE_OK));
+  private static final Set<String> ALL_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_ERROR, FINISHING_PHASE_OK));
+  private static final Set<String> ERROR_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_ERROR));
+  private static final Set<String> OK_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_OK));
   @Requirement
   private Maven maven;
 
@@ -92,15 +97,23 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
         return;
       }
 
+      final MavenExecutionResult sessionResult = session.getResult();
+
       final List<SingleFinishingTask> allFoundTasks = new ArrayList<>();
       for (final MavenProject project : session.getProjects()) {
+        final BuildSummary projectBuildSummary = sessionResult.getBuildSummary(project);
+        if (projectBuildSummary == null) {
+          this.logger.warn(String.format("Project '%s' is ignored because was not built", project.getId()));
+          continue;
+        }
+
         if (isTrueSkipFlagFound(session, project)) {
           this.logger.debug("Detected skip finishing flag for project: " + project.getId());
           continue;
         }
         for (final Plugin buildPlugin : project.getBuildPlugins()) {
           for (final PluginExecution execution : buildPlugin.getExecutions()) {
-            if (FINISHING_PHASES.contains(execution.getPhase())) {
+            if (ALL_FINISHING_PHASES.contains(execution.getPhase())) {
               final SingleFinishingTask task = new SingleFinishingTask(execution.getPhase(), project, buildPlugin, execution);
               this.logger.debug("Found finishing task: " + task);
               allFoundTasks.add(new SingleFinishingTask(execution.getPhase(), project, buildPlugin, execution));
@@ -108,6 +121,8 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
           }
         }
       }
+
+      this.logger.info(String.format("Totally detected %d finishing task(s)", allFoundTasks.size()));
 
       Collections.reverse(allFoundTasks);
       Collections.sort(allFoundTasks, (x, y) -> {
@@ -124,35 +139,37 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
         this.logger.info("START FINISHING");
         this.logger.info(LINE);
 
-        final MavenExecutionResult result = session.getResult();
-
-        final Set<String> allowedPhases = new HashSet<>();
-
-        allowedPhases.add(FINISHING_PHASE);
-        if (result.hasExceptions()) {
-          allowedPhases.add(FINISHING_PHASE_ERROR);
-        } else {
-          allowedPhases.add(FINISHING_PHASE_OK);
-        }
-
         int calledTaskCount = 0;
         int errorTaskCount = 0;
 
         boolean hasError = false;
-        for (final SingleFinishingTask t : allFoundTasks) {
-          if (allowedPhases.contains(t.phase)) {
-            this.logger.debug("Detected finishing task: " + t);
-            final MavenExecutionResult taskResult = t.execute(this.maven, session);
+        for (final SingleFinishingTask task : allFoundTasks) {
+          final BuildSummary buildSummary = sessionResult.getBuildSummary(task.project);
+
+          final boolean executionAllowed;
+
+          if (buildSummary instanceof BuildSuccess) {
+            executionAllowed = OK_FINISHING_PHASES.contains(task.phase);
+          } else if (buildSummary instanceof BuildFailure) {
+            executionAllowed = ERROR_FINISHING_PHASES.contains(task.phase);
+          } else {
+            this.logger.warn("Detected unexpected BuildSummary object type for project: " + buildSummary.getClass().getSimpleName());
+            executionAllowed = false;
+          }
+
+          if (executionAllowed) {
+            this.logger.debug("Detected finishing task: " + task);
+            final MavenExecutionResult taskResult = task.execute(this.maven, session);
             calledTaskCount++;
             if (taskResult.hasExceptions()) {
               errorTaskCount++;
-              this.logger.error("Error during finishing task: " + t);
+              this.logger.error("Error during finishing task: " + task);
               hasError = true;
             } else {
-              this.logger.debug("Finishing task completed: " + t);
+              this.logger.debug("Finishing task completed: " + task);
             }
           } else {
-            this.logger.debug("Ignored finishing task: " + t);
+            this.logger.debug("Ignored finishing task: " + task);
           }
         }
 
