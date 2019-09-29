@@ -52,7 +52,7 @@ in the case, after session processing end (either successful or error) the task 
 
 If defined several finishing tasks then they will be sorted in such manner:
 - list of projects in order provided in maven session project list
-- only projectes with build status will be processed 
+- only projects with provided build status will be processed 
 - if any error in session build then execution order is:
   - __finish-error__
   - __finish__
