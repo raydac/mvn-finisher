@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.igormaznitsa</groupId>
+    <artifactId>mvngolang-tests</artifactId>
+
+    <packaging>jar</packaging>
+    <name>Test GoLangMojo</name>
+    <version>1.0.0-SNAPSHOT</version>
+
+    <properties>
+        <mvn.golang.module.mode>true</mvn.golang.module.mode>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.igormaznitsa</groupId>
+                <artifactId>mvn-golang-wrapper</artifactId>
+                <goals>
+                    <goal>clean</goal>
+                </goals>
+                <configuration>
+                    <moduleMode>true</moduleMode>
+                    <goRoot>some/root</goRoot>
+                    <goPath>some/path</goPath>
+                    <sources>some/sources</sources>
+                    <buildFlags>
+                        <flag>flag1</flag>
+                        <flag>flag2</flag>
+                    </buildFlags>
+                    <packages>
+                        <package>one_pack</package>
+                        <package>two_pack</package>
+                    </packages>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

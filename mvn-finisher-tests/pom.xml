@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.igormaznitsa</groupId>
+        <artifactId>mvn-finisher</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>mvn-finisher-tests</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>mvn-finisher-test-simple</module>
+    </modules>
+
+    <build>
+        <extensions>
+            <extension>
+                <groupId>com.igormaznitsa</groupId>
+                <artifactId>mvn-finisher-extension</artifactId>
+                <version>${maven.finisher.version}</version>
+            </extension>
+        </extensions>
+    </build>
+
+</project>
