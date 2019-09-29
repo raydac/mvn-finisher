@@ -23,7 +23,7 @@ Small [maven](https://maven.apache.org/) extesion adds three new phases into bui
         <extension>
             <groupId>com.igormaznitsa</groupId>
                 <artifactId>mvn-finisher-extension</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
+                <version>1.0.0</version>
         </extension>
     </extensions>
 </build>
