@@ -5,7 +5,7 @@
 [![PayPal donation](https://img.shields.io/badge/donation-PayPal-red.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=AHWJHJFBAWGL2)
 [![Yandex.Money donation](https://img.shields.io/badge/donation-Я.деньги-yellow.svg)](http://yasobe.ru/na/iamoss)
 
-![banner](./assertions/banner.png)
+![banner](assets/banner.png)
 
 # What is it
 Small [maven](https://maven.apache.org/) extesion adds three new phases into build process:
