@@ -48,3 +48,14 @@ after every end of session build, the extenstion looks for for finishing tasks i
 </plugin>
 ```
 in the case, after session processing end (either successful or error) the task `print-echo` is executed.
+
+If defined several finishing tasks then they will be sorted in such manner:
+- list of projects with found finishing tasks is reversed
+- if any error in session build then execution order is:
+  - __finish-error__
+  - __finish__
+- if session build is ok then execution order is:
+  - __finish-ok__
+  - __finish__
+  
+__Each detected task is called separately in its own maven request so that all them will be executed even if some of them can be error.__

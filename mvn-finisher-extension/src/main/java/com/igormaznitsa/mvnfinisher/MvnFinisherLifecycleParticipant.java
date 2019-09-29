@@ -79,25 +79,33 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
   public void afterSessionEnd(final MavenSession session) throws MavenExecutionException {
 
     if (tryLockFinishingOfSession(session)) {
-      final List<SingleFinishingTask> allTasks = new ArrayList<>();
+      final List<SingleFinishingTask> allFoundTasks = new ArrayList<>();
       for (final MavenProject p : session.getProjects()) {
         for (final Plugin pl : p.getBuildPlugins()) {
           for (final PluginExecution e : pl.getExecutions()) {
             if (FINISHING_PHASES.contains(e.getPhase())) {
               final SingleFinishingTask task = new SingleFinishingTask(e.getPhase(), p, pl, e);
               this.logger.debug("Found finishing task: " + task);
-              allTasks.add(new SingleFinishingTask(e.getPhase(), p, pl, e));
+              allFoundTasks.add(new SingleFinishingTask(e.getPhase(), p, pl, e));
             }
           }
         }
       }
 
-      Collections.reverse(allTasks);
+      Collections.reverse(allFoundTasks);
+      Collections.sort(allFoundTasks, (x, y) -> {
+        if (x.phase.equals(y.phase)) {
+          return 0;
+        }
+        return FINISHING_PHASE.equals(x.phase) ? 1 : -1;
+      });
 
-      if (!allTasks.isEmpty()) {
-        this.logger.info("------------------------------------------------------------------------");
+      final String LINE = "------------------------------------------------------------------------";
+
+      if (!allFoundTasks.isEmpty()) {
+        this.logger.info(LINE);
         this.logger.info("START FINISHING");
-        this.logger.info("------------------------------------------------------------------------");
+        this.logger.info(LINE);
 
         final MavenExecutionResult result = session.getResult();
 
@@ -114,7 +122,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
         int errorTaskCount = 0;
 
         boolean hasError = false;
-        for (final SingleFinishingTask t : allTasks) {
+        for (final SingleFinishingTask t : allFoundTasks) {
           if (allowedPhases.contains(t.phase)) {
             this.logger.debug("Detected finishing task: " + t);
             final MavenExecutionResult taskResult = t.execute(this.maven, session);
@@ -132,13 +140,13 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
         }
 
         if (hasError) {
-          this.logger.error("------------------------------------------------------------------------");
+          this.logger.error(LINE);
           this.logger.error(format("FINISHING COMPLETED WITH ERRORS, executed %d task(s), %d error(s)", calledTaskCount, errorTaskCount));
-          this.logger.error("------------------------------------------------------------------------");
+          this.logger.error(LINE);
         } else {
-          this.logger.info("------------------------------------------------------------------------");
+          this.logger.info(LINE);
           this.logger.info(format("FINISHING COMPLETED SUCCESSFULLY, executed %d task(s) ", calledTaskCount));
-          this.logger.info("------------------------------------------------------------------------");
+          this.logger.info(LINE);
         }
       }
     } else {

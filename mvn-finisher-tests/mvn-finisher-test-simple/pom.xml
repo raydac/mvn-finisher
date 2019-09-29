@@ -27,7 +27,27 @@
                             <goal>echo</goal>
                         </goals>
                         <configuration>
-                            <message>Hello World from finishing task</message>
+                            <message>FINISH</message>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>print-echo-error</id>
+                        <phase>finish-error</phase>
+                        <goals>
+                            <goal>echo</goal>
+                        </goals>
+                        <configuration>
+                            <message>FINISH-ERROR</message>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>print-echo-ok</id>
+                        <phase>finish-ok</phase>
+                        <goals>
+                            <goal>echo</goal>
+                        </goals>
+                        <configuration>
+                            <message>FINISH-OK</message>
                         </configuration>
                     </execution>
                 </executions>
