@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.maven.AbstractMavenLifecycleParticipant;
 import org.apache.maven.Maven;
 import org.apache.maven.MavenExecutionException;
@@ -67,8 +68,12 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
 
   private final List<MavenSession> nonProcessedMavenSessions = new CopyOnWriteArrayList<>();
 
+  private static final AtomicBoolean inShutdown = new AtomicBoolean();
+
   public MvnFinisherLifecycleParticipant() {
-    Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "mvn-finisher-shutdown-hook"));
+    if (!inShutdown.get()) {
+      Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "mvn-finisher-shutdown-hook"));
+    }
   }
 
   private static String findProperty(
@@ -106,24 +111,26 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
   }
 
   private void shutdown() {
-    final List<MavenSession> nonClosedSessions = new ArrayList<>(this.nonProcessedMavenSessions);
-    this.logger.debug("Start mvn-finisher shutdown hook, detected " + nonClosedSessions.size() + " non-closed sessions");
-    Collections.reverse(nonClosedSessions);
-    for (final MavenSession s : nonClosedSessions) {
-      if (s.getRequest() != null && s.getRequest().getStartTime() == null) {
-        this.logger.info("Ignoring unfinished session " + s + " because it was not started");
-        continue;
+    if (inShutdown.compareAndSet(false, true)) {
+      final List<MavenSession> nonClosedSessions = new ArrayList<>(this.nonProcessedMavenSessions);
+      this.logger.debug("Start mvn-finisher shutdown hook, detected " + nonClosedSessions.size() + " non-closed sessions");
+      Collections.reverse(nonClosedSessions);
+      for (final MavenSession s : nonClosedSessions) {
+        if (s.getRequest() != null && s.getRequest().getStartTime() == null) {
+          this.logger.info("Ignoring unfinished session " + s + " because it was not started");
+          continue;
+        }
+        try {
+          this.logger.warn("Force finish of unfinished session: " + s);
+          this.finishSession(s, true);
+        } catch (MavenExecutionException ex) {
+          this.logger.error("Detected MavenExecutionException", ex);
+        } finally {
+          this.logger.warn("Session finished: " + s);
+        }
       }
-      try {
-        this.logger.warn("Force finish of unfinished session: " + s);
-        this.finishSession(s, true);
-      } catch (MavenExecutionException ex) {
-        this.logger.error("Detected MavenExecutionException", ex);
-      } finally {
-        this.logger.warn("Session finished: " + s);
-      }
+      this.logger.debug("mvn-finisher shutdown hook work completed");
     }
-    this.logger.debug("mvn-finisher shutdown hook work completed");
   }
 
   private boolean isSkip(final MavenSession session, final MavenProject project) {
