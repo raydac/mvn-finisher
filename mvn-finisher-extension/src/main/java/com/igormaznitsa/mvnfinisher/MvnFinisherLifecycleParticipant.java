@@ -26,8 +26,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.maven.AbstractMavenLifecycleParticipant;
 import org.apache.maven.Maven;
 import org.apache.maven.MavenExecutionException;
@@ -52,17 +53,40 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
   public static final String FINISHING_PHASE = "finish";
   public static final String FINISHING_PHASE_OK = "finish-ok";
   public static final String FINISHING_PHASE_ERROR = "finish-error";
+  public static final String FINISHING_PHASE_FORCE = "finish-force";
   public static final String FINISHING_FLAG_FILE = ".finishingStarted";
   private static final Set<String> ALL_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_ERROR, FINISHING_PHASE_OK));
   private static final Set<String> ERROR_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_ERROR));
   private static final Set<String> OK_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_OK));
+  private static final Set<String> FORCE_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_FORCE));
   @Requirement
   private Maven maven;
 
   @Requirement
   private Logger logger;
 
-  private AtomicBoolean called = new AtomicBoolean();
+  private final List<MavenSession> nonProcessedMavenSessions = new CopyOnWriteArrayList<>();
+
+  public MvnFinisherLifecycleParticipant() {
+    Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "mvn-finisher-shutdown-hook"));
+  }
+
+  private static String findProperty(
+      final MavenSession session,
+      final MavenProject project,
+      final String key,
+      final String defaultValue
+  ) {
+    final Properties properties = new Properties();
+    if (project != null) {
+      properties.putAll(project.getProperties());
+    }
+    if (session != null) {
+      properties.putAll(session.getSystemProperties());
+      properties.putAll(session.getUserProperties());
+    }
+    return properties.getProperty(key, defaultValue);
+  }
 
   private boolean tryLockFinishingOfSession(final MavenSession session) throws MavenExecutionException {
     try {
@@ -81,18 +105,40 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
     }
   }
 
-  private boolean isTrueSkipFlagFound(final MavenSession session, final MavenProject project) {
-    String value = session.getUserProperties().getProperty(SKIP_PROPERTY, null);
-    if (value == null && project != null) {
-      value = project.getProperties().getProperty(SKIP_PROPERTY, null);
+  private void shutdown() {
+    final List<MavenSession> nonClosedSessions = new ArrayList<>(this.nonProcessedMavenSessions);
+    this.logger.debug("Start mvn-finisher shutdown hook, detected " + nonClosedSessions.size() + " non-closed sessions");
+    Collections.reverse(nonClosedSessions);
+    for (final MavenSession s : nonClosedSessions) {
+      if (s.getRequest() != null && s.getRequest().getStartTime() == null) {
+        this.logger.info("Ignoring unfinished session " + s + " because it was not started");
+        continue;
+      }
+      try {
+        this.logger.warn("Force finish of unfinished session: " + s);
+        this.finishSession(s, true);
+      } catch (MavenExecutionException ex) {
+        this.logger.error("Detected MavenExecutionException", ex);
+      } finally {
+        this.logger.warn("Session finished: " + s);
+      }
     }
-    return Boolean.parseBoolean(value);
+    this.logger.debug("mvn-finisher shutdown hook work completed");
+  }
+
+  private boolean isSkip(final MavenSession session, final MavenProject project) {
+    return Boolean.parseBoolean(findProperty(session, project, SKIP_PROPERTY, "false"));
   }
 
   @Override
-  public void afterSessionEnd(final MavenSession session) throws MavenExecutionException {
+  public void afterProjectsRead(MavenSession session) throws MavenExecutionException {
+    this.logger.debug("registering session in afterProjectsRead: " + session);
+    this.nonProcessedMavenSessions.add(session);
+  }
+
+  private void finishSession(final MavenSession session, final boolean force) throws MavenExecutionException {
     if (tryLockFinishingOfSession(session)) {
-      if (isTrueSkipFlagFound(session, null)) {
+      if (isSkip(session, null)) {
         this.logger.info("Skip finishing");
         return;
       }
@@ -100,16 +146,15 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
       final MavenExecutionResult sessionResult = session.getResult();
 
       final List<SingleFinishingTask> allFoundTasks = new ArrayList<>();
-      for (final MavenProject project : session.getProjects()) {
+      session.getProjects().forEach(project -> {
         final BuildSummary projectBuildSummary = sessionResult.getBuildSummary(project);
-        if (projectBuildSummary == null) {
-          this.logger.warn(String.format("Project '%s' is ignored because was not built", project.getId()));
-          continue;
+        if (projectBuildSummary == null && !force) {
+          this.logger.warn(format("Project '%s' is ignored because was not built", project.getId()));
+          return;
         }
-
-        if (isTrueSkipFlagFound(session, project)) {
+        if (isSkip(session, project)) {
           this.logger.debug("Detected skip finishing flag for project: " + project.getId());
-          continue;
+          return;
         }
         for (final Plugin buildPlugin : project.getBuildPlugins()) {
           for (final PluginExecution execution : buildPlugin.getExecutions()) {
@@ -120,11 +165,11 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
             }
           }
         }
-      }
+      });
 
       this.logger.info(String.format("Totally detected %d finishing task(s)", allFoundTasks.size()));
 
-      Collections.sort(allFoundTasks, (x, y) -> {
+      allFoundTasks.sort((x, y) -> {
         if (x.phase.equals(y.phase)) {
           return 0;
         }
@@ -135,7 +180,11 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
 
       if (!allFoundTasks.isEmpty()) {
         this.logger.info(LINE);
-        this.logger.info("START FINISHING");
+        if (force) {
+          this.logger.warn("START FORCE FINISHING");
+        } else {
+          this.logger.info("START FINISHING");
+        }
         this.logger.info(LINE);
 
         int calledTaskCount = 0;
@@ -152,8 +201,14 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
           } else if (buildSummary instanceof BuildFailure) {
             executionAllowed = ERROR_FINISHING_PHASES.contains(task.phase);
           } else {
-            this.logger.warn("Detected unexpected BuildSummary object type for project: " + buildSummary.getClass().getSimpleName());
-            executionAllowed = false;
+            if (buildSummary != null) {
+              this.logger.warn("Detected unexpected BuildSummary object type for project: " + buildSummary.getClass().getSimpleName());
+            }
+            if (force) {
+              executionAllowed = FORCE_FINISHING_PHASES.contains(task.phase);
+            } else {
+              executionAllowed = false;
+            }
           }
 
           if (executionAllowed) {
@@ -185,7 +240,13 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
     } else {
       this.logger.debug("Looks like that finishing already started for session: " + session);
     }
+  }
 
+  @Override
+  public void afterSessionEnd(final MavenSession session) throws MavenExecutionException {
+    this.logger.debug("afterSessionEnd: " + session);
+    this.nonProcessedMavenSessions.remove(session);
+    finishSession(session, false);
   }
 
   private final class SingleFinishingTask {
