@@ -20,6 +20,7 @@ import static java.lang.String.format;
 
 
 import java.io.File;
+import java.io.IOError;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,12 +51,16 @@ import org.codehaus.plexus.logging.Logger;
 @Component(role = AbstractMavenLifecycleParticipant.class, hint = "mvnfinisher")
 public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParticipant {
 
+  private static final String SHUTDOWN_HOOK_THREAD_ID = "mvn-finisher-shutdown-hook-thread";
+  private static final String FLAG_FINISHING_SESSION = "mvn.finisher.finishing.session";
+
   public static final String SKIP_PROPERTY = "mvn.finisher.skip";
   public static final String FINISHING_PHASE = "finish";
   public static final String FINISHING_PHASE_OK = "finish-ok";
   public static final String FINISHING_PHASE_ERROR = "finish-error";
   public static final String FINISHING_PHASE_FORCE = "finish-force";
   public static final String FINISHING_FLAG_FILE = ".finishingStarted";
+
   private static final Set<String> ALL_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_ERROR, FINISHING_PHASE_OK));
   private static final Set<String> ERROR_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_ERROR));
   private static final Set<String> OK_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_OK));
@@ -67,12 +72,11 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
   private Logger logger;
 
   private final List<MavenSession> nonProcessedMavenSessions = new CopyOnWriteArrayList<>();
-
-  private static final AtomicBoolean inShutdown = new AtomicBoolean();
+  private static final AtomicBoolean shutdowning = new AtomicBoolean();
 
   public MvnFinisherLifecycleParticipant() {
-    if (!inShutdown.get()) {
-      Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "mvn-finisher-shutdown-hook"));
+    if (!isShutdownActive()) {
+      Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, SHUTDOWN_HOOK_THREAD_ID));
     }
   }
 
@@ -93,6 +97,20 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
     return properties.getProperty(key, defaultValue);
   }
 
+  private static boolean isShutdownActive() {
+    return SHUTDOWN_HOOK_THREAD_ID.equals(Thread.currentThread().getName()) || shutdowning.get();
+  }
+
+  private void deleteFinishingFlagIfExist(final MavenSession session) {
+    if (!isShutdownActive()) {
+      final File baseDirectory = new File(session.getRequest().getBaseDirectory());
+      final File lockFile = new File(baseDirectory, FINISHING_FLAG_FILE);
+      if (lockFile.isFile() && !lockFile.delete()) {
+        throw new IOError(new IOException("Detected lock file can't be deleted: " + lockFile));
+      }
+    }
+  }
+
   private boolean tryLockFinishingOfSession(final MavenSession session) throws MavenExecutionException {
     try {
       final File baseDirectory = new File(session.getRequest().getBaseDirectory());
@@ -111,7 +129,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
   }
 
   private void shutdown() {
-    if (inShutdown.compareAndSet(false, true)) {
+    if (shutdowning.compareAndSet(false, true)) {
       final List<MavenSession> nonClosedSessions = new ArrayList<>(this.nonProcessedMavenSessions);
       this.logger.debug("Start mvn-finisher shutdown hook, detected " + nonClosedSessions.size() + " non-closed sessions");
       Collections.reverse(nonClosedSessions);
@@ -138,9 +156,14 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
   }
 
   @Override
-  public void afterProjectsRead(MavenSession session) throws MavenExecutionException {
-    this.logger.debug("registering session in afterProjectsRead: " + session);
-    this.nonProcessedMavenSessions.add(session);
+  public void afterProjectsRead(final MavenSession session) throws MavenExecutionException {
+    if (Boolean.parseBoolean(session.getUserProperties().getProperty(FLAG_FINISHING_SESSION, "false"))) {
+      this.logger.debug("Detected flag " + FLAG_FINISHING_SESSION);
+    } else {
+      deleteFinishingFlagIfExist(session);
+      this.logger.debug("registering session in afterProjectsRead: " + session);
+      this.nonProcessedMavenSessions.add(session);
+    }
   }
 
   private void finishSession(final MavenSession session, final boolean force) throws MavenExecutionException {
@@ -276,6 +299,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
 
     private MavenExecutionResult execute(final Maven maven, final MavenSession baseSession) {
       final MavenExecutionRequest newRequest = DefaultMavenExecutionRequest.copy(baseSession.getRequest());
+      newRequest.getUserProperties().put(FLAG_FINISHING_SESSION, "true");
       newRequest.setSelectedProjects(Collections.singletonList(this.project.getId()));
 
       final String projectId = project.getGroupId() + ':' + project.getArtifactId();
