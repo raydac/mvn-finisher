@@ -248,6 +248,9 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
             if (taskResult.hasExceptions()) {
               errorTaskCount++;
               this.logger.error("Error during finishing task: " + task);
+              for (final Throwable e : taskResult.getExceptions()) {
+                this.logger.debug("DETECTED ERROR: " + e.getMessage(), e);
+              }
               hasError = true;
             } else {
               this.logger.debug("Finishing task completed: " + task);
