@@ -41,6 +41,16 @@
                         </configuration>
                     </execution>
                     <execution>
+                        <id>print-echo-force</id>
+                        <phase>finish-force</phase>
+                        <goals>
+                            <goal>echo</goal>
+                        </goals>
+                        <configuration>
+                            <message>FINISH-FORCE</message>
+                        </configuration>
+                    </execution>
+                    <execution>
                         <id>print-echo-ok</id>
                         <phase>finish-ok</phase>
                         <goals>

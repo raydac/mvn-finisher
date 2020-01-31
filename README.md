@@ -7,15 +7,24 @@
 
 ![banner](assets/banner.png)
 
+# Changelog
+
+__1.0.1 (31-jan-2020)__
+ - added catch of JVM shutdown, its phase __finish-force__
+ 
+__1.0.0 (29-sep-2019)__
+ - initial release
+
 # What is it
 Small [maven](https://maven.apache.org/) extesion adds three new phases into build process:
- - __finish__ is called in any case after session build completion
- - __finish-ok__ is called only if session is built without errors
- - __finish-error__ is called only if session is built with errors
+ - __finish__ is called in any case if session is started (also called in JVM shutdown)
+ - __finish-ok__ is called only if session is built without errors (called in JVM shutdown only if session build completed)
+ - __finish-error__ is called only if session is built with errors (called in JVM shutdown only if session buuld completed)
+ - __finish-force__ is called only if JVM shutdown (press CTRL+C for instance)
  
  It's behavior very similar to well-known `try...catch...finally` mechanism where __finish-error__ situated in the `catch` section and __finish__ situated in the `finally` section, __finish-ok__ will be called as the last ones in the body.
- 
- # How to use?
+
+# How to use?
  Just add extension into project build extension section
 ```xml
 <build>
@@ -23,7 +32,7 @@ Small [maven](https://maven.apache.org/) extesion adds three new phases into bui
         <extension>
             <groupId>com.igormaznitsa</groupId>
                 <artifactId>mvn-finisher-extension</artifactId>
-                <version>1.0.0</version>
+                <version>1.0.1</version>
         </extension>
     </extensions>
 </build>
@@ -83,7 +92,7 @@ Below you can see some example of extension use. The example starts some docker 
             <extension>
                 <groupId>com.igormaznitsa</groupId>
                 <artifactId>mvn-finisher-extension</artifactId>
-                <version>1.0.0</version>
+                <version>1.0.1</version>
             </extension>
         </extensions>
         <plugins>
