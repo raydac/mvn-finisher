@@ -398,7 +398,8 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
       request.setRecursive(true);
       request.setBaseDirectory(project.getBasedir());
 
-      final Properties properties = new Properties(session.getUserProperties());
+      final Properties properties = new Properties();
+      properties.putAll(session.getUserProperties());
       properties.put(FLAG_FINISHING_SESSION, "true");
       request.setProperties(properties);
 
