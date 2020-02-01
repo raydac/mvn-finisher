@@ -89,6 +89,8 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
   private final Map<MavenSession, List<MavenProject>> sessionProjectMap = new ConcurrentHashMap<>();
   private final Map<MavenSession, Boolean> processingSessions = new ConcurrentHashMap<>();
 
+  private static final int MAX_FINISH_TASK_ALLOWED_TIME_SECONDS = 120;
+
   @Requirement
   private Maven maven;
 
@@ -404,7 +406,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
       properties.putAll(session.getUserProperties());
       properties.put(FLAG_FINISHING_SESSION, "true");
       request.setProperties(properties);
-      request.setTimeoutInSeconds(100);
+      request.setTimeoutInSeconds(MAX_FINISH_TASK_ALLOWED_TIME_SECONDS);
 
       final List<String> goals = new ArrayList<>();
       for (final String g : this.execution.getGoals()) {
@@ -434,7 +436,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
         }
       } catch (Exception ex) {
         if (ex instanceof CommandLineTimeOutException) {
-          logger.error("Finish task has been interrupted because takes too long time!");
+          logger.error(String.format("Finish task interrupted because longer than %d seconds!", MAX_FINISH_TASK_ALLOWED_TIME_SECONDS));
         } else {
           logger.error("Can't invoke maven", ex);
         }
