@@ -276,7 +276,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
             }
           });
 
-          this.logger.info(String.format("Totally detected %d finishing task(s)", allFoundTasks.size()));
+          this.logger.info(String.format("Totally detected %d potential finishing task(s)", allFoundTasks.size()));
 
           allFoundTasks.sort((x, y) -> {
             if (x.phase.equals(y.phase)) {
