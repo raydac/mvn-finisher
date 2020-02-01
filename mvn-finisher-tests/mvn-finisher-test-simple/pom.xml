@@ -14,6 +14,9 @@
 
     <profiles>
         <profile>
+            <properties>
+                <user.text>internal text</user.text>
+            </properties>
             <id>sp</id>
             <build>
                 <plugins>
@@ -31,7 +34,7 @@
                                 <configuration>
                                     <basePath>${build.directory}</basePath>
                                     <toFile>from.profile.txt</toFile>
-                                    <message>Message from profile</message>
+                                    <message>Message from profile ${user.text}</message>
                                 </configuration>
                             </execution>
                         </executions>

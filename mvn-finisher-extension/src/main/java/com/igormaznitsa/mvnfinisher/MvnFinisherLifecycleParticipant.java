@@ -393,6 +393,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
       request.setAlsoMakeDependents(false);
       request.setBatchMode(true);
       request.setThreads("1");
+      request.setOffline(session.isOffline());
       request.setShellEnvironmentInherited(true);
       request.setPomFile(project.getFile());
       request.setRecursive(true);
