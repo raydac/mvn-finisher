@@ -55,6 +55,8 @@ import org.apache.maven.shared.invoker.MavenCommandLineBuilder;
 import org.apache.maven.shared.invoker.MavenInvocationException;
 import org.apache.maven.shared.utils.Os;
 import org.apache.maven.shared.utils.StringUtils;
+import org.apache.maven.shared.utils.cli.CommandLineException;
+import org.apache.maven.shared.utils.cli.CommandLineTimeOutException;
 import org.apache.maven.shared.utils.cli.CommandLineUtils;
 import org.apache.maven.shared.utils.cli.Commandline;
 import org.apache.maven.shared.utils.cli.ShutdownHookUtils;
@@ -252,10 +254,9 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
 
           final List<SingleFinishingTask> allFoundTasks = new ArrayList<>();
           sessionProjects.forEach(project -> {
-            logger.warn("Project: " + project.getArtifactId());
             final BuildSummary projectBuildSummary = sessionResult.getBuildSummary(project);
             if (projectBuildSummary == null && !force) {
-              this.logger.warn(format("Project '%s' is ignored because was not built", project.getId()));
+              this.logger.warn(format("Project '%s' is ignored because session was not created", project.getId()));
               return;
             }
             if (isSkip(session, project)) {
@@ -266,7 +267,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
               for (final PluginExecution execution : buildPlugin.getExecutions()) {
                 if (ALL_FINISHING_PHASES.contains(execution.getPhase())) {
                   final SingleFinishingTask task = new SingleFinishingTask(execution.getPhase(), project, buildPlugin, execution);
-                  this.logger.info("Found finishing task: " + task);
+                  this.logger.info("Found finishing task: " + task.execution.getId() + " (" + project.getArtifactId() + ')');
                   allFoundTasks.add(task);
                 }
               }
@@ -403,6 +404,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
       properties.putAll(session.getUserProperties());
       properties.put(FLAG_FINISHING_SESSION, "true");
       request.setProperties(properties);
+      request.setTimeoutInSeconds(100);
 
       final List<String> goals = new ArrayList<>();
       for (final String g : this.execution.getGoals()) {
@@ -426,8 +428,16 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
       final InvocationResult invokeResult;
       try {
         invokeResult = invoker.execute(request);
+        final CommandLineException cliException = invokeResult.getExecutionException();
+        if (cliException != null) {
+          throw cliException;
+        }
       } catch (Exception ex) {
-        logger.error("Can't invoke maven", ex);
+        if (ex instanceof CommandLineTimeOutException) {
+          logger.error("Finish task has been interrupted because takes too long time!");
+        } else {
+          logger.error("Can't invoke maven", ex);
+        }
         result.addBuildSummary(new BuildFailure(project, System.currentTimeMillis() - startTime, ex));
         return result;
       }
