@@ -436,10 +436,13 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
       final long time = System.currentTimeMillis() - startTime;
 
       for (final String s : outputList) {
-        logger.debug(s);
+        logger.debug("OUT> " + s);
       }
 
       if (exitCode == 0) {
+        for (final String s : errList) {
+          logger.debug("ERR> " + s);
+        }
         result.addBuildSummary(new BuildSuccess(project, time));
       } else {
         for (final String s : errList) {
