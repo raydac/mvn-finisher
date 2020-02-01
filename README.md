@@ -9,6 +9,9 @@
 
 # Changelog
 
+__1.1.0 (SNAPSHOT)__
+ - finish task execution moved to external process 
+
 __1.0.1 (31-jan-2020)__
  - added catch of JVM shutdown, its phase __finish-force__
  
