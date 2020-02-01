@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 import org.apache.maven.AbstractMavenLifecycleParticipant;
 import org.apache.maven.Maven;
 import org.apache.maven.MavenExecutionException;
@@ -46,7 +45,6 @@ import org.apache.maven.execution.MavenExecutionResult;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Plugin;
 import org.apache.maven.model.PluginExecution;
-import org.apache.maven.model.Profile;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.shared.invoker.DefaultInvocationRequest;
 import org.apache.maven.shared.invoker.DefaultInvoker;
@@ -390,7 +388,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
           project.getFile()));
 
       final InvocationRequest request = new DefaultInvocationRequest();
-      request.setProfiles(session.getRequest().getProfiles().stream().map(Profile::getId).collect(Collectors.toList()));
+      request.setProfiles(session.getSettings().getActiveProfiles());
       request.setAlsoMake(false);
       request.setAlsoMakeDependents(false);
       request.setBatchMode(true);

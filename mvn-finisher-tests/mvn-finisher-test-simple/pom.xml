@@ -12,6 +12,34 @@
     <artifactId>mvn-finisher-test-simple</artifactId>
     <packaging>jar</packaging>
 
+    <profiles>
+        <profile>
+            <id>sp</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.ekryd.echo-maven-plugin</groupId>
+                        <artifactId>echo-maven-plugin</artifactId>
+                        <version>1.2.0</version>
+                        <executions>
+                            <execution>
+                                <id>in-profile</id>
+                                <phase>finish</phase>
+                                <goals>
+                                    <goal>echo</goal>
+                                </goals>
+                                <configuration>
+                                    <basePath>${build.directory}</basePath>
+                                    <toFile>from.profile.txt</toFile>
+                                    <message>Message from profile</message>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <build>
         <plugins>
@@ -27,6 +55,8 @@
                             <goal>echo</goal>
                         </goals>
                         <configuration>
+                            <basePath>${build.directory}</basePath>
+                            <toFile>finish.finish.txt</toFile>
                             <message>FINISH</message>
                         </configuration>
                     </execution>
@@ -37,6 +67,8 @@
                             <goal>echo</goal>
                         </goals>
                         <configuration>
+                            <basePath>${build.directory}</basePath>
+                            <toFile>finish.error.txt</toFile>
                             <message>FINISH-ERROR</message>
                         </configuration>
                     </execution>
@@ -48,6 +80,8 @@
                         </goals>
                         <configuration>
                             <message>FINISH-FORCE</message>
+                            <basePath>${build.directory}</basePath>
+                            <toFile>finish.force.txt</toFile>
                         </configuration>
                     </execution>
                     <execution>
@@ -57,6 +91,8 @@
                             <goal>echo</goal>
                         </goals>
                         <configuration>
+                            <basePath>${build.directory}</basePath>
+                            <toFile>finish.ok.txt</toFile>
                             <message>FINISH-OK</message>
                         </configuration>
                     </execution>
