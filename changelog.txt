@@ -4,5 +4,5 @@ __1.1.0 (02-feb-2020)__
 __1.0.1 (31-jan-2020)__
  - added catch of JVM shutdown, its phase __finish-force__
 
-1.0.0 (29-sep-2019)
+__1.0.0 (29-sep-2019)__
  - initial version
