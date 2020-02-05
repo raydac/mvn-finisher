@@ -9,8 +9,12 @@
 
 # Changelog
 
+__1.1.1 (SNAPSHOT)__
+ - added properties `mvn.finisher.log.save` and `mvn,finisher.log.folder` to save log of finish tasks
+ - minor improvements and bug fixing
+
 __1.1.0 (02-feb-2020)__
- - finish tasks started as external processes 
+ - finish tasks started as external processes
 
 __1.0.1 (31-jan-2020)__
  - added catch of JVM shutdown, its phase __finish-force__
