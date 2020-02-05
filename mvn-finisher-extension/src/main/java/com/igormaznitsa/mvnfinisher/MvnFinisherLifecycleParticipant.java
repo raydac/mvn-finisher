@@ -20,9 +20,13 @@ import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOError;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,7 +39,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.maven.AbstractMavenLifecycleParticipant;
-import org.apache.maven.Maven;
 import org.apache.maven.MavenExecutionException;
 import org.apache.maven.execution.BuildFailure;
 import org.apache.maven.execution.BuildSuccess;
@@ -90,9 +93,8 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
   private final Map<MavenSession, Boolean> processingSessions = new ConcurrentHashMap<>();
 
   private static final int MAX_FINISH_TASK_ALLOWED_TIME_SECONDS = 120;
-
-  @Requirement
-  private Maven maven;
+  private static final String PROPERTY_SAVE_LOG = "mvn.finisher.log.save";
+  private static final String PROPERTY_SAVE_LOG_FOLDER = "mvn.finisher.log.folder";
 
   @Requirement
   private Logger logger;
@@ -360,6 +362,11 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
 
   @Override
   public void afterSessionEnd(final MavenSession session) throws MavenExecutionException {
+    if (Boolean.parseBoolean(session.getUserProperties().getProperty(FLAG_FINISHING_SESSION, "false"))) {
+      this.logger.debug("Detected flag " + FLAG_FINISHING_SESSION + ", ignoring afterSessionEnd");
+      return;
+    }
+
     this.logger.debug("afterSessionEnd: " + session);
     this.nonProcessedMavenSessions.remove(session);
     finishSession(session, false);
@@ -381,6 +388,54 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
     @Override
     public String toString() {
       return format("Finishing task(%s, %s, %s, %s, %s)", this.project.getFile(), this.phase, this.project.getId(), this.plugin.getId(), this.execution.getId());
+    }
+
+    private void logToFile(
+        final MavenSession session,
+        final MavenProject project,
+        final String finishTaskName,
+        final List<String> out,
+        final List<String> err
+    ) {
+      final boolean saveLog = Boolean.parseBoolean(findProperty(session, project, PROPERTY_SAVE_LOG, "false"));
+
+      if (saveLog) {
+        final String saveLogFolder = findProperty(session, project, PROPERTY_SAVE_LOG_FOLDER, project.getBuild().getDirectory() + File.separatorChar + "mvn.finisher.logs");
+
+        final File outputFolder = new File(saveLogFolder);
+        if (!outputFolder.isDirectory() && !outputFolder.mkdirs()) {
+          logger.error("Can't create log folder: " + outputFolder);
+          return;
+        }
+
+        logger.debug("Log will be saved at " + outputFolder);
+        final StringBuilder buffer = new StringBuilder();
+
+        for (final String s : out) {
+          buffer.append('\n').append(s);
+        }
+
+        if (!err.isEmpty()) {
+          buffer.append("\n[ERROR OUT]----------------------").append('\n');
+          for (final String s : err) {
+            buffer.append('\n').append(s);
+          }
+        }
+
+        final File logFile = new File(outputFolder,
+            String.format("%s.%s.%s_%s.log",
+                project.getGroupId(),
+                project.getArtifactId(),
+                project.getVersion(),
+                finishTaskName));
+        try (final OutputStream outStream = new BufferedOutputStream(new FileOutputStream(logFile, false))) {
+          outStream.write(buffer.toString().getBytes(StandardCharsets.UTF_8));
+          outStream.flush();
+          logger.info(String.format("Finisher log for '%s' saved as '%s'", finishTaskName, logFile.getName()));
+        } catch (final IOException ex) {
+          logger.error("Can't save finish task log into " + logFile, ex);
+        }
+      }
     }
 
     private MavenExecutionResult execute(final MavenSession session) {
@@ -407,6 +462,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
       properties.put(FLAG_FINISHING_SESSION, "true");
       request.setProperties(properties);
       request.setTimeoutInSeconds(MAX_FINISH_TASK_ALLOWED_TIME_SECONDS);
+      request.setDebug(logger.isDebugEnabled());
 
       final List<String> goals = new ArrayList<>();
       for (final String g : this.execution.getGoals()) {
@@ -447,13 +503,15 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
 
       final long time = System.currentTimeMillis() - startTime;
 
+      logToFile(session, this.project, this.execution.getId(), outputList, errList);
+
       for (final String s : outputList) {
-        logger.debug("OUT> " + s);
+        logger.debug("FINISH.OUT> " + s);
       }
 
       if (exitCode == 0) {
         for (final String s : errList) {
-          logger.debug("ERR> " + s);
+          logger.debug("FINISH.ERR> " + s);
         }
         result.addBuildSummary(new BuildSuccess(project, time));
       } else {
