@@ -16,6 +16,7 @@
 
 package com.igormaznitsa.mvnfinisher;
 
+import static java.lang.Boolean.parseBoolean;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -74,33 +75,27 @@ import org.codehaus.plexus.logging.Logger;
 @Component(role = AbstractMavenLifecycleParticipant.class, hint = "mvnfinisher")
 public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParticipant {
 
-  private static final String SHUTDOWN_HOOK_THREAD_ID = "mvn-finisher-shutdown-hook-thread";
-  private static final String FLAG_FINISHING_SESSION = "mvn.finisher.finishing.session";
-
-  public static final String SKIP_PROPERTY = "mvn.finisher.skip";
   public static final String FINISHING_PHASE = "finish";
   public static final String FINISHING_PHASE_OK = "finish-ok";
   public static final String FINISHING_PHASE_ERROR = "finish-error";
   public static final String FINISHING_PHASE_FORCE = "finish-force";
   public static final String FINISHING_FLAG_FILE = ".finishingStarted";
-
+  private static final String SHUTDOWN_HOOK_THREAD_ID = "mvn-finisher-shutdown-hook-thread";
+  private static final String FLAG_FINISHING_SESSION = "mvn.finisher.finishing.session";
   private static final Set<String> ALL_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_ERROR, FINISHING_PHASE_OK));
   private static final Set<String> ERROR_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_ERROR));
   private static final Set<String> OK_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_OK));
   private static final Set<String> FORCE_FINISHING_PHASES = new HashSet<>(Arrays.asList(FINISHING_PHASE, FINISHING_PHASE_FORCE));
-
-  private final Map<MavenSession, List<MavenProject>> sessionProjectMap = new ConcurrentHashMap<>();
-  private final Map<MavenSession, Boolean> processingSessions = new ConcurrentHashMap<>();
-
   private static final int MAX_FINISH_TASK_ALLOWED_TIME_SECONDS = 120;
+  private static final String PROPERTY_SKIP = "mvn.finisher.skip";
   private static final String PROPERTY_SAVE_LOG = "mvn.finisher.log.save";
   private static final String PROPERTY_SAVE_LOG_FOLDER = "mvn.finisher.log.folder";
-
+  private static final AtomicBoolean shutdowning = new AtomicBoolean();
+  private final Map<MavenSession, List<MavenProject>> sessionProjectMap = new ConcurrentHashMap<>();
+  private final Map<MavenSession, Boolean> processingSessions = new ConcurrentHashMap<>();
+  private final List<MavenSession> nonProcessedMavenSessions = new CopyOnWriteArrayList<>();
   @Requirement
   private Logger logger;
-
-  private final List<MavenSession> nonProcessedMavenSessions = new CopyOnWriteArrayList<>();
-  private static final AtomicBoolean shutdowning = new AtomicBoolean();
 
   public MvnFinisherLifecycleParticipant() {
     //--heat invocator because during force shutdown some class can be not found
@@ -109,6 +104,27 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
     if (!isShutdownActive()) {
       ShutdownHookUtils.addShutDownHook(new Thread(this::shutdown, SHUTDOWN_HOOK_THREAD_ID));
     }
+  }
+
+  private static String findProperty(
+      final MavenSession session,
+      final MavenProject project,
+      final String key,
+      final String defaultValue
+  ) {
+    final Properties properties = new Properties();
+    if (project != null) {
+      properties.putAll(project.getProperties());
+    }
+    if (session != null) {
+      properties.putAll(session.getSystemProperties());
+      properties.putAll(session.getUserProperties());
+    }
+    return properties.getProperty(key, defaultValue);
+  }
+
+  private static boolean isShutdownActive() {
+    return SHUTDOWN_HOOK_THREAD_ID.equals(Thread.currentThread().getName()) || shutdowning.get();
   }
 
   private void silentClassLoad(final String name) {
@@ -154,27 +170,6 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
       requireNonNull(CommandLineUtils.getSystemEnvVars());
       requireNonNull(InvocationRequest.CheckSumPolicy.Fail);
     }
-  }
-
-  private static String findProperty(
-      final MavenSession session,
-      final MavenProject project,
-      final String key,
-      final String defaultValue
-  ) {
-    final Properties properties = new Properties();
-    if (project != null) {
-      properties.putAll(project.getProperties());
-    }
-    if (session != null) {
-      properties.putAll(session.getSystemProperties());
-      properties.putAll(session.getUserProperties());
-    }
-    return properties.getProperty(key, defaultValue);
-  }
-
-  private static boolean isShutdownActive() {
-    return SHUTDOWN_HOOK_THREAD_ID.equals(Thread.currentThread().getName()) || shutdowning.get();
   }
 
   private void deleteFinishingFlagIfExist(final MavenSession session) {
@@ -228,12 +223,14 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
   }
 
   private boolean isSkip(final MavenSession session, final MavenProject project) {
-    return Boolean.parseBoolean(findProperty(session, project, SKIP_PROPERTY, "false"));
+    return parseBoolean(findProperty(session, project, PROPERTY_SKIP, "false"));
   }
 
   @Override
   public void afterProjectsRead(final MavenSession session) throws MavenExecutionException {
-    if (Boolean.parseBoolean(session.getUserProperties().getProperty(FLAG_FINISHING_SESSION, "false"))) {
+    if (isSkip(session, null)) {
+      this.logger.debug("Skipping finisher");
+    } else if (parseBoolean(session.getUserProperties().getProperty(FLAG_FINISHING_SESSION, "false"))) {
       this.logger.debug("Detected flag " + FLAG_FINISHING_SESSION);
     } else {
       deleteFinishingFlagIfExist(session);
@@ -362,14 +359,15 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
 
   @Override
   public void afterSessionEnd(final MavenSession session) throws MavenExecutionException {
-    if (Boolean.parseBoolean(session.getUserProperties().getProperty(FLAG_FINISHING_SESSION, "false"))) {
+    if (isSkip(session, null)) {
+      this.logger.debug("skipped");
+    } else if (parseBoolean(session.getUserProperties().getProperty(FLAG_FINISHING_SESSION, "false"))) {
       this.logger.debug("Detected flag " + FLAG_FINISHING_SESSION + ", ignoring afterSessionEnd");
-      return;
+    } else {
+      this.logger.debug("afterSessionEnd: " + session);
+      this.nonProcessedMavenSessions.remove(session);
+      finishSession(session, false);
     }
-
-    this.logger.debug("afterSessionEnd: " + session);
-    this.nonProcessedMavenSessions.remove(session);
-    finishSession(session, false);
   }
 
   private final class SingleFinishingTask {
@@ -397,7 +395,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
         final List<String> out,
         final List<String> err
     ) {
-      final boolean saveLog = Boolean.parseBoolean(findProperty(session, project, PROPERTY_SAVE_LOG, "false"));
+      final boolean saveLog = parseBoolean(findProperty(session, project, PROPERTY_SAVE_LOG, "false"));
 
       if (saveLog) {
         final String saveLogFolder = findProperty(session, project, PROPERTY_SAVE_LOG_FOLDER, project.getBuild().getDirectory() + File.separatorChar + "mvn.finisher.logs");
