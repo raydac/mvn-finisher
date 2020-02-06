@@ -423,10 +423,8 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
         }
 
         final File logFile = new File(outputFolder,
-            String.format("%s.%s.%s_%s.log",
-                project.getGroupId(),
+            String.format("%s_%s.log",
                 project.getArtifactId(),
-                project.getVersion(),
                 finishTaskName));
         try (final OutputStream outStream = new BufferedOutputStream(new FileOutputStream(logFile, false))) {
           outStream.write(buffer.toString().getBytes(StandardCharsets.UTF_8));
