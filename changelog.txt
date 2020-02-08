@@ -1,5 +1,7 @@
-__1.1.1 (SNAPSHOT)__
- - added properties `mvn.finisher.log.save` and `mvn,finisher.log.folder` to save log of finish tasks
+__1.1.1 (08-feb-2020)__
+ - added property for finish task timeout `mvn.finisher.task.timeout` in seconds, by default 120 seconds
+ - added property to skip execution `mvn.finisher.skip`
+ - added properties `mvn.finisher.log.save` and `mvn,finisher.log.folder` to save finish task log
  - minor improvements and bug fixing
 
 __1.1.0 (02-feb-2020)__

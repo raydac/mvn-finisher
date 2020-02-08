@@ -1,6 +1,6 @@
 [![License Apache 2.0](https://img.shields.io/badge/license-Apache%20License%202.0-green.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 [![Java 8.0+](https://img.shields.io/badge/java-8.0%2b-green.svg)](http://www.oracle.com/technetwork/java/javase/downloads/index.html)
-[![Maven central](https://maven-badges.herokuapp.com/maven-central/com.igormaznitsa/mvn-finisher-extension/badge.svg)](http://search.maven.org/#artifactdetails|com.igormaznitsa|mvn-finisher-extension|1.0.1|jar)
+[![Maven central](https://maven-badges.herokuapp.com/maven-central/com.igormaznitsa/mvn-finisher-extension/badge.svg)](http://search.maven.org/#artifactdetails|com.igormaznitsa|mvn-finisher-extension|1.1.1|jar)
 [![Maven 3.3.1+](https://img.shields.io/badge/maven-3.3.1%2b-green.svg)](https://maven.apache.org/)
 [![PayPal donation](https://img.shields.io/badge/donation-PayPal-red.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=AHWJHJFBAWGL2)
 [![Yandex.Money donation](https://img.shields.io/badge/donation-Я.деньги-yellow.svg)](http://yasobe.ru/na/iamoss)
@@ -9,8 +9,10 @@
 
 # Changelog
 
-__1.1.1 (SNAPSHOT)__
- - added properties `mvn.finisher.log.save` and `mvn,finisher.log.folder` to save log of finish tasks
+__1.1.1 (08-feb-2020)__
+ - added property for finish task timeout `mvn.finisher.task.timeout` in seconds, by default 120 seconds
+ - added property to skip execution `mvn.finisher.skip`
+ - added properties `mvn.finisher.log.save` and `mvn,finisher.log.folder` to save finish task log
  - minor improvements and bug fixing
 
 __1.1.0 (02-feb-2020)__
@@ -31,20 +33,20 @@ Small [maven](https://maven.apache.org/) extesion adds three new phases into bui
  
  It's behavior very similar to well-known `try...catch...finally` mechanism where __finish-error__ situated in the `catch` section and __finish__ situated in the `finally` section, __finish-ok__ will be called as the last ones in the body.
 
-# How to use?
- Just add extension into project build extension section
+# How to add in a project?
+ Just add extension into the build extensions section
 ```xml
 <build>
     <extensions>
         <extension>
             <groupId>com.igormaznitsa</groupId>
                 <artifactId>mvn-finisher-extension</artifactId>
-                <version>1.0.1</version>
+                <version>1.1.1</version>
         </extension>
     </extensions>
 </build>
 ```
-after every end of session build, the extenstion looks for for finishing tasks in all session projects, for instance task to print some message into console:
+after end of session build, the extenstion finds finishing tasks in all session projects, for instance task to print some message into console:
 ```xml
 <plugin>
     <groupId>com.github.ekryd.echo-maven-plugin</groupId>
@@ -64,7 +66,8 @@ after every end of session build, the extenstion looks for for finishing tasks i
     </executions>
 </plugin>
 ```
-in the case, after session processing end (either successful or error) the task `print-echo` is executed.
+in the code snippet above, there is `print-echo` task to be executed during finish phase. If the maven build process was interrupted then `force finish` is activated.   
+Since 1.1.0 all finishing tasks are executed as __external__ processes through call of maven.
 
 If defined several finishing tasks then they will be sorted in such manner:
 - list of projects in order provided in maven session project list
@@ -75,10 +78,29 @@ If defined several finishing tasks then they will be sorted in such manner:
 - if session build is ok then execution order is:
   - __finish-ok__
   - __finish__
+- if session canceled (for instance by CTRL+C) then execution order is:
+  - __finish-force__
+  - __finish__
   
 __Each detected task is called separately in its own maven request so that all them will be executed even if some of them can be error.__
 
-Work of the extension can be disabled through `mvn.finisher.skip` parameter which can be provided globaly through `-Dmvn.finisher.skip=true` else locally on level of each project through its local project properties.
+# Extension properties
+
+## mvn.finisher.skip
+
+It is a boolean property and can be either `true` or `false`. By default it is `false`. If it is `true` then execution of the extension will be skipped.
+
+## mvn.finisher.log.save
+
+Flag to save log of finishing tasks as text files with name pattern `artifactId_finishTaskId.log`. By default is `false`.
+
+## mvn.finisher.log.folder
+
+Folder to save log files. By defaul it is `mvn.finisher.logs` in the project build folder.  
+
+## mvn.finisher.task.timeout
+
+It allows to define finish task timeout __in seconds__. By default it is 120 seconds.
 
 # Example
 Below you can see some example of extension use. The example starts some docker image and then stop and remove it in finishing tasks.
@@ -99,7 +121,7 @@ Below you can see some example of extension use. The example starts some docker 
             <extension>
                 <groupId>com.igormaznitsa</groupId>
                 <artifactId>mvn-finisher-extension</artifactId>
-                <version>1.0.1</version>
+                <version>1.1.1</version>
             </extension>
         </extensions>
         <plugins>

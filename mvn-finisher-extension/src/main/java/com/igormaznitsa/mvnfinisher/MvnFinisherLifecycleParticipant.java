@@ -90,6 +90,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
   private static final String PROPERTY_SKIP = "mvn.finisher.skip";
   private static final String PROPERTY_SAVE_LOG = "mvn.finisher.log.save";
   private static final String PROPERTY_SAVE_LOG_FOLDER = "mvn.finisher.log.folder";
+  private static final String PROPERTY_TASK_TIMEOUT = "mvn.finisher.task.timeout";
   private static final AtomicBoolean shutdowning = new AtomicBoolean();
   private final Map<MavenSession, List<MavenProject>> sessionProjectMap = new ConcurrentHashMap<>();
   private final Map<MavenSession, Boolean> processingSessions = new ConcurrentHashMap<>();
@@ -434,6 +435,25 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
       }
     }
 
+    private int findFinishTaskTimeoutSeconds(final MavenSession session, final MavenProject project) {
+      final String timeout = findProperty(session, project, PROPERTY_TASK_TIMEOUT, Integer.toString(MAX_FINISH_TASK_ALLOWED_TIME_SECONDS));
+      int result;
+      try {
+        result = Integer.parseInt(timeout.trim());
+        if (result <= 0) {
+          throw new NumberFormatException("Illegal value");
+        }
+      } catch (NumberFormatException ex) {
+        logger.error(String.format("Detected illegal value '%s' for '%s', default %d seconds in use",
+            timeout,
+            PROPERTY_TASK_TIMEOUT,
+            MAX_FINISH_TASK_ALLOWED_TIME_SECONDS
+        ));
+        result = MAX_FINISH_TASK_ALLOWED_TIME_SECONDS;
+      }
+      return result;
+    }
+
     private MavenExecutionResult execute(final MavenSession session) {
       final String projectId = project.getGroupId() + ':' + project.getArtifactId();
       logger.debug(String.format("executing %s for project %s pom file is %s",
@@ -442,6 +462,7 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
           project.getFile()));
 
       final InvocationRequest request = new DefaultInvocationRequest();
+      request.setUpdateSnapshots(session.getRequest().isUpdateSnapshots());
       request.setProfiles(session.getSettings().getActiveProfiles());
       request.setAlsoMake(false);
       request.setAlsoMakeDependents(false);
@@ -457,7 +478,8 @@ public class MvnFinisherLifecycleParticipant extends AbstractMavenLifecycleParti
       properties.putAll(session.getUserProperties());
       properties.put(FLAG_FINISHING_SESSION, "true");
       request.setProperties(properties);
-      request.setTimeoutInSeconds(MAX_FINISH_TASK_ALLOWED_TIME_SECONDS);
+      request.setTimeoutInSeconds(findFinishTaskTimeoutSeconds(session, project));
+
       request.setDebug(logger.isDebugEnabled());
 
       final List<String> goals = new ArrayList<>();
