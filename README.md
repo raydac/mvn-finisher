@@ -2,8 +2,8 @@
 [![Java 8.0+](https://img.shields.io/badge/java-8.0%2b-green.svg)](http://www.oracle.com/technetwork/java/javase/downloads/index.html)
 [![Maven central](https://maven-badges.herokuapp.com/maven-central/com.igormaznitsa/mvn-finisher-extension/badge.svg)](http://search.maven.org/#artifactdetails|com.igormaznitsa|mvn-finisher-extension|1.1.1|jar)
 [![Maven 3.3.1+](https://img.shields.io/badge/maven-3.3.1%2b-green.svg)](https://maven.apache.org/)
-[![PayPal donation](https://img.shields.io/badge/donation-PayPal-red.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=AHWJHJFBAWGL2)
-[![Yandex.Money donation](https://img.shields.io/badge/donation-Я.деньги-yellow.svg)](http://yasobe.ru/na/iamoss)
+[![PayPal donation](https://img.shields.io/badge/donation-PayPal-cyan.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=AHWJHJFBAWGL2)
+[![YooMoney donation](https://img.shields.io/badge/donation-Yoo.money-blue.svg)](https://yoomoney.ru/to/41001158080699)
 
 ![banner](assets/banner.png)
 
